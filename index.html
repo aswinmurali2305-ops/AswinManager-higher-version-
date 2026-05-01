@@ -11,14 +11,34 @@
 <style>
 body { background-color: #e5e7eb; }
 .dark { background-color: #000 !important; color: white; }
-.dark .bg-white { background-color: #1f2937 !important; }
-.dark .bg-gray-200 { background-color: #374151 !important; }
+
 .page { display: none; }
 .active { display: block; }
+
+/* ✅ COMMON UI (YOUR STYLE) */
+.card {
+  background: white;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 8px;
+}
+
+.btn {
+  padding: 4px 8px;
+  color: white;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.btn-blue { background: #3b82f6; }
+.btn-green { background: #22c55e; }
+.btn-red { background: #ef4444; }
+.btn-pink { background: #ec4899; }
+
 </style>
 </head>
 
-<body id="body">
+<body>
 
 <!-- HEADER -->
 <div class="flex justify-between p-3 bg-blue-600 text-white">
@@ -40,28 +60,28 @@ body { background-color: #e5e7eb; }
 <div id="dashboard" class="page active p-3">
 
 <div class="grid grid-cols-2 gap-2 mb-3">
-<div class="bg-white p-2 rounded">Monthly Services: <span id="monthCount">0</span></div>
-<div class="bg-white p-2 rounded">Weekly Services: <span id="weekCount">0</span></div>
-<div class="bg-white p-2 rounded">Money Received: $<span id="received">0</span></div>
-<div class="bg-white p-2 rounded">Pending: $<span id="pending">0</span></div>
+<div class="card">Monthly: <span id="monthCount">0</span></div>
+<div class="card">Weekly: <span id="weekCount">0</span></div>
+<div class="card">Received: $<span id="received">0</span></div>
+<div class="card">Pending: $<span id="pending">0</span></div>
 </div>
 
-<div class="bg-white p-3 rounded mb-3">
+<div class="card">
 <input id="name" placeholder="Customer Name" class="border p-1 w-full mb-2">
 <input type="date" id="date" class="border p-1 w-full mb-2">
 <input type="time" id="time" class="border p-1 w-full mb-2">
-<button onclick="addService()" class="bg-blue-500 text-white px-3 py-1 rounded">Add</button>
+<button onclick="addService()" class="btn btn-blue w-full">Add</button>
 </div>
 
 </div>
 
-<!-- LOG PAGE -->
+<!-- LOG -->
 <div id="log" class="page p-3">
 <h2 class="font-bold mb-2">Log History</h2>
 <div id="logList"></div>
 </div>
 
-<!-- CLIENT PAGE -->
+<!-- CLIENTS -->
 <div id="clients" class="page p-3">
 <h2 class="font-bold mb-2">Clients</h2>
 <div id="clientList"></div>
@@ -69,40 +89,21 @@ body { background-color: #e5e7eb; }
 
 <!-- CALENDAR -->
 <div id="calendar" class="page p-3">
-<input type="date" id="calDate" onchange="showCalendarLogs()">
+<input type="date" id="calDate" onchange="showCalendarLogs()" class="border p-2 w-full mb-2">
 <div id="calLogs"></div>
 </div>
 
 <!-- SUMMARY -->
 <div id="summary" class="page p-3">
 
-<h2 class="font-bold mb-3">📊 Summary</h2>
+<input type="month" id="monthPicker" onchange="renderSummary()" class="border p-2 w-full mb-3">
 
-<input type="month" id="monthPicker" class="border p-2 mb-3" onchange="renderSummary()">
+<div class="card"><h3>Services by Day</h3><canvas id="dayChart"></canvas></div>
+<div class="card"><h3>Services by Week</h3><canvas id="weekChart"></canvas></div>
+<div class="card"><h3>Revenue</h3><canvas id="revenueChart"></canvas></div>
+<div class="card"><h3>Top Customers</h3><canvas id="customerChart"></canvas></div>
 
-<div class="bg-white p-3 rounded mb-3">
-<h3 class="font-bold mb-2">Services by Day</h3>
-<canvas id="dayChart"></canvas>
-</div>
-
-<div class="bg-white p-3 rounded mb-3">
-<h3 class="font-bold mb-2">Services by Week</h3>
-<canvas id="weekChart"></canvas>
-</div>
-
-<div class="bg-white p-3 rounded mb-3">
-<h3 class="font-bold mb-2">Revenue per Week</h3>
-<canvas id="revenueChart"></canvas>
-</div>
-
-<div class="bg-white p-3 rounded mb-3">
-<h3 class="font-bold mb-2">Top Customers</h3>
-<canvas id="customerChart"></canvas>
-</div>
-
-<button onclick="downloadCharts()" class="bg-green-500 text-white p-2 w-full rounded">
-Download Charts
-</button>
+<button onclick="downloadCharts()" class="btn btn-green w-full mt-2">Download Charts</button>
 
 </div>
 
@@ -126,31 +127,37 @@ function toggleDark(){
 document.body.classList.toggle("dark");
 }
 
-function addService(){
-let name = document.getElementById("name").value;
-let date = document.getElementById("date").value;
-let time = document.getElementById("time").value;
+/* FORMAT */
+function formatTime(t){
+let [h,m]=t.split(":");
+h=Number(h);
+let ampm=h>=12?"PM":"AM";
+h=h%12||12;
+return `${h}:${m} ${ampm}`;
+}
 
-if(!name || !date || !time) return alert("Fill all fields");
+/* ADD */
+function addService(){
+let name=nameInput.value;
+let date=dateInput.value;
+let time=timeInput.value;
+
+if(!name||!date||!time) return alert("Fill all");
 
 logs.push({name,date,time,paid:false});
 save();
 }
 
+/* STATS */
 function updateStats(){
-let now = new Date();
-let month = now.getMonth();
-
+let now=new Date();
 let m=0,w=0,r=0,p=0;
 
 logs.forEach(l=>{
 let d=new Date(l.date);
-
-if(d.getMonth()===month) m++;
+if(d.getMonth()==now.getMonth()) m++;
 if(d>=new Date(Date.now()-7*86400000)) w++;
-
-if(l.paid) r+=15;
-else p+=15;
+if(l.paid) r+=15; else p+=15;
 });
 
 monthCount.innerText=m;
@@ -159,16 +166,15 @@ received.innerText=r;
 pending.innerText=p;
 }
 
+/* LOG */
 function renderLogs(){
-let div = document.getElementById("logList");
-div.innerHTML = "";
-
+logList.innerHTML="";
 logs.forEach((l,i)=>{
-div.innerHTML += `
-<div class="bg-white p-2 mt-2 rounded">
-${l.name} - ${l.date}
-<div class="flex gap-2 mt-1">
-<button onclick="deleteLog(${i})" class="bg-red-500 text-white px-2">Delete</button>
+logList.innerHTML+=`
+<div class="card">
+${l.name} - ${l.date} ${formatTime(l.time)}
+<div class="flex gap-2 mt-2">
+<button onclick="deleteLog(${i})" class="btn btn-red">Delete</button>
 </div>
 </div>`;
 });
@@ -179,6 +185,7 @@ logs.splice(i,1);
 save();
 }
 
+/* CLIENTS */
 function renderClients(){
 let map={};
 
@@ -187,12 +194,10 @@ if(!map[l.name]) map[l.name]=0;
 if(!l.paid) map[l.name]+=15;
 });
 
-let div=document.getElementById("clientList");
-div.innerHTML="";
-
+clientList.innerHTML="";
 Object.keys(map).forEach(name=>{
-div.innerHTML+=`
-<div onclick="openClient('${name}')" class="bg-white p-2 mt-2 rounded flex justify-between">
+clientList.innerHTML+=`
+<div onclick="openClient('${name}')" class="card flex justify-between">
 <span>${name}</span>
 <span>$${map[name]}</span>
 </div>`;
@@ -200,23 +205,22 @@ div.innerHTML+=`
 }
 
 function openClient(name){
-let data=logs.map((l,i)=>({...l,i}))
-.filter(l=>l.name===name);
+let data=logs.map((l,i)=>({...l,i})).filter(l=>l.name==name);
 
-let html=`<button onclick="renderClients()" class="bg-gray-500 text-white px-2 py-1 mb-2">⬅ Back</button><h3 class="font-bold">${name}</h3>`;
+let html=`<button onclick="renderClients()" class="btn btn-blue">Back</button><h3>${name}</h3>`;
 
 data.forEach(l=>{
 html+=`
-<div class="bg-gray-200 p-2 mt-1">
-${l.date}
-<div class="flex gap-2 mt-1">
-<button onclick="markPaid(${l.i})" class="bg-green-500 text-white px-2">Paid</button>
-<button onclick="deleteLog(${l.i})" class="bg-red-500 text-white px-2">Delete</button>
+<div class="card">
+${l.date} ${formatTime(l.time)}
+<div class="flex gap-2 mt-2">
+<button onclick="markPaid(${l.i})" class="btn btn-green">Paid</button>
+<button onclick="deleteLog(${l.i})" class="btn btn-red">Delete</button>
 </div>
 </div>`;
 });
 
-html+=`<button onclick="share('${name}')" class="bg-blue-500 text-white mt-2 p-2 w-full">Share via WhatsApp</button>`;
+html+=`<button onclick="share('${name}')" class="btn btn-blue w-full mt-2">Share via WhatsApp</button>`;
 
 clientList.innerHTML=html;
 }
@@ -226,106 +230,86 @@ logs[i].paid=true;
 save();
 }
 
+/* WHATSAPP */
 function share(name){
-let data=logs.filter(l=>l.name===name&&!l.paid);
+let data=logs.filter(l=>l.name==name&&!l.paid);
 let total=data.length*15;
 
 let msg=`Hi ${name}\nPending:\n`;
-
-data.forEach(l=>{ msg+=l.date+"\n"; });
-
+data.forEach(l=>msg+=l.date+"\n");
 msg+=`Total $${total}`;
 
-let encoded=encodeURIComponent(msg);
+let e=encodeURIComponent(msg);
 
-window.location.href=`whatsapp://send?text=${encoded}`;
-setTimeout(()=>window.open(`https://wa.me/?text=${encoded}`),1500);
+window.location.href=`whatsapp://send?text=${e}`;
+setTimeout(()=>window.open(`https://wa.me/?text=${e}`),1500);
 }
 
+/* CALENDAR */
 function showCalendarLogs(){
 let d=calDate.value;
 calLogs.innerHTML="";
-logs.filter(l=>l.date===d)
-.forEach(l=>calLogs.innerHTML+=`<div>${l.name}</div>`);
+
+logs.forEach((l,i)=>{
+if(l.date===d){
+calLogs.innerHTML+=`
+<div class="card">
+${l.name} ${formatTime(l.time)}
+<div class="flex gap-2 mt-2">
+<button onclick="markPaid(${i})" class="btn btn-green">Paid</button>
+<button onclick="deleteLog(${i})" class="btn btn-red">Delete</button>
+</div>
+</div>`;
+}
+});
 }
 
 /* SUMMARY */
-
 let dayChart,weekChart,revenueChart,customerChart;
 
 function renderSummary(){
 
-let selected=monthPicker.value;
 let now=new Date();
+let m=monthPicker.value?new Date(monthPicker.value).getMonth():now.getMonth();
 
-let month=selected?new Date(selected).getMonth():now.getMonth();
-let year=selected?new Date(selected).getFullYear():now.getFullYear();
-
-let days=[0,0,0,0,0,0,0];
-let weeks=[0,0,0,0,0];
-let revenue=[0,0,0,0,0];
-let customers={};
+let days=[0,0,0,0,0,0,0],weeks=[0,0,0,0,0],rev=[0,0,0,0,0],cust={};
 
 logs.forEach(l=>{
 let d=new Date(l.date);
+if(d.getMonth()!=m) return;
 
-if(d.getMonth()!=month||d.getFullYear()!=year) return;
-
-let day=d.getDay();
-day=(day===0)?6:day-1;
+let day=d.getDay(); day=day==0?6:day-1;
 days[day]++;
 
 let w=Math.ceil(d.getDate()/7);
 weeks[w-1]++;
 
-if(l.paid) revenue[w-1]+=15;
+if(l.paid) rev[w-1]+=15;
 
-if(!customers[l.name]) customers[l.name]=0;
-customers[l.name]++;
+if(!cust[l.name]) cust[l.name]=0;
+cust[l.name]++;
 });
 
-let top=Object.entries(customers).sort((a,b)=>b[1]-a[1]).slice(0,5);
+let top=Object.entries(cust).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
-[dayChart,weekChart,revenueChart,customerChart].forEach(c=>{ if(c) c.destroy(); });
+[dayChart,weekChart,revenueChart,customerChart].forEach(c=>{if(c)c.destroy();});
 
-let options={
-responsive:true,
-plugins:{legend:{display:false}},
-scales:{y:{beginAtZero:true,ticks:{precision:0}}}
-};
+dayChart=new Chart(dayChart=document.getElementById("dayChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:days}]}});
 
-dayChart=new Chart(dayChart=document.getElementById("dayChart"),{
-type:"bar",
-data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:days}]},
-options:options
-});
+weekChart=new Chart(document.getElementById("weekChart"),{type:"bar",data:{labels:["W1","W2","W3","W4","W5"],datasets:[{data:weeks}]}});
 
-weekChart=new Chart(document.getElementById("weekChart"),{
-type:"bar",
-data:{labels:["W1","W2","W3","W4","W5"],datasets:[{data:weeks}]},
-options:options
-});
+revenueChart=new Chart(document.getElementById("revenueChart"),{type:"bar",data:{labels:["W1","W2","W3","W4","W5"],datasets:[{data:rev}]}});
 
-revenueChart=new Chart(document.getElementById("revenueChart"),{
-type:"bar",
-data:{labels:["W1","W2","W3","W4","W5"],datasets:[{data:revenue}]},
-options:options
-});
-
-customerChart=new Chart(document.getElementById("customerChart"),{
-type:"bar",
-data:{labels:top.map(c=>c[0]),datasets:[{data:top.map(c=>c[1])}]},
-options:options
-});
+customerChart=new Chart(document.getElementById("customerChart"),{type:"bar",data:{labels:top.map(x=>x[0]),datasets:[{data:top.map(x=>x[1])}]}});
 
 }
 
 function downloadCharts(){
 [dayChart,weekChart,revenueChart,customerChart].forEach((c,i)=>{
-if(!c) return;
+if(!c)return;
 let a=document.createElement("a");
 a.href=c.toBase64Image();
-a.download=`chart_${i+1}.png`;
+a.download=`chart${i}.png`;
 a.click();
 });
 }
