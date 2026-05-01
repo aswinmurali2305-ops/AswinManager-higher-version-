@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aswin's Money Manager</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body { background-color: #e5e7eb; }
+.dark { background-color: #000 !important; color: white; }
+.dark .bg-white { background-color: #1f2937 !important; }
+.dark .bg-gray-200 { background-color: #374151 !important; }
+.page { display: none; }
+.active { display: block; }
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="flex justify-between p-3 bg-blue-600 text-white">
+<button onclick="location.reload()">🔄</button>
+<h1 class="font-bold">Aswin's Money Manager</h1>
+<button onclick="toggleDark()">🌙</button>
+</div>
+
+<!-- NAV -->
+<div class="flex flex-wrap justify-around bg-gray-300 p-2 text-sm">
+<button onclick="showPage('dashboard')">Dashboard</button>
+<button onclick="showPage('log')">Log</button>
+<button onclick="showPage('clients')">Clients</button>
+<button onclick="showPage('calendar')">Calendar</button>
+<button onclick="showPage('summary'); renderSummary()">Summary</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="page active p-3">
+
+<div class="grid grid-cols-2 gap-2 mb-3">
+<div class="bg-white p-2 rounded">Monthly: <span id="monthCount">0</span></div>
+<div class="bg-white p-2 rounded">Weekly: <span id="weekCount">0</span></div>
+<div class="bg-white p-2 rounded">Received: $<span id="received">0</span></div>
+<div class="bg-white p-2 rounded">Pending: $<span id="pending">0</span></div>
+</div>
+
+<div class="bg-white p-3 rounded mb-3">
+<input id="name" placeholder="Customer Name" class="border p-1 w-full mb-2">
+<input type="date" id="date" class="border p-1 w-full mb-2">
+<input type="time" id="time" class="border p-1 w-full mb-2">
+<button onclick="addService()" class="bg-blue-500 text-white px-3 py-1 rounded w-full">Add</button>
+</div>
+
+</div>
+
+<!-- LOG -->
+<div id="log" class="page p-3">
+<h2 class="font-bold mb-2">Logs</h2>
+<div id="logList"></div>
+</div>
+
+<!-- CLIENTS -->
+<div id="clients" class="page p-3">
+<h2 class="font-bold mb-2">Clients</h2>
+<div id="clientList"></div>
+</div>
+
+<!-- CALENDAR -->
+<div id="calendar" class="page p-3">
+<input type="date" id="calDate" onchange="showCalendarLogs()">
+<div id="calLogs"></div>
+</div>
+
+<!-- SUMMARY -->
+<div id="summary" class="page p-3">
+
+<input type="month" id="monthPicker" onchange="renderSummary()" class="border p-2 mb-3">
+
+<h3 class="font-bold">Day Analysis</h3>
+<canvas id="dayChart"></canvas>
+
+<h3 class="font-bold mt-5">Week Analysis</h3>
+<canvas id="weekChart"></canvas>
+
+<h3 class="font-bold mt-5">Revenue</h3>
+<canvas id="revenueChart"></canvas>
+
+<h3 class="font-bold mt-5">Top Customers</h3>
+<canvas id="customerChart"></canvas>
+
+<button onclick="downloadCharts()" class="bg-green-500 text-white p-2 w-full mt-3">Download Charts</button>
+
+</div>
+
+<script>
+
+let logs = JSON.parse(localStorage.getItem("logs")) || [];
+
+function save(){
+localStorage.setItem("logs", JSON.stringify(logs));
+updateStats();
+renderLogs();
+renderClients();
+}
+
+function showPage(id){
+document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+document.getElementById(id).classList.add('active');
+}
+
+function toggleDark(){
+document.body.classList.toggle("dark");
+}
+
+function addService(){
+let name = document.getElementById("name").value;
+let date = document.getElementById("date").value;
+let time = document.getElementById("time").value;
+
+if(!name || !date || !time) return alert("Fill all");
+
+logs.push({name,date,time,paid:false});
+save();
+}
+
+function updateStats(){
+let now = new Date();
+let month=now.getMonth();
+
+let m=0,w=0,r=0,p=0;
+
+logs.forEach(l=>{
+let d=new Date(l.date);
+
+if(d.getMonth()==month) m++;
+if(d>=new Date(now.setDate(now.getDate()-7))) w++;
+
+if(l.paid) r+=15;
+else p+=15;
+});
+
+monthCount.innerText=m;
+weekCount.innerText=w;
+received.innerText=r;
+pending.innerText=p;
+}
+
+function renderLogs(){
+logList.innerHTML="";
+logs.forEach((l,i)=>{
+logList.innerHTML+=`
+<div class="bg-white p-2 mt-2">
+${l.name} ${l.date}
+<button onclick="deleteLog(${i})">❌</button>
+</div>`;
+});
+}
+
+function deleteLog(i){
+logs.splice(i,1);
+save();
+}
+
+function renderClients(){
+let map={};
+
+logs.forEach(l=>{
+if(!map[l.name]) map[l.name]=0;
+if(!l.paid) map[l.name]+=15;
+});
+
+clientList.innerHTML="";
+
+Object.keys(map).forEach(name=>{
+clientList.innerHTML+=`
+<div onclick="openClient('${name}')" class="bg-white p-2 mt-2 flex justify-between">
+<span>${name}</span>
+<span>$${map[name]}</span>
+</div>`;
+});
+}
+
+function openClient(name){
+let data=logs.map((l,i)=>({...l,i}))
+.filter(l=>l.name==name);
+
+let html=`<button onclick="renderClients()">Back</button><h3>${name}</h3>`;
+
+data.forEach(l=>{
+html+=`
+<div>${l.date}
+<button onclick="markPaid(${l.i})">Paid</button>
+</div>`;
+});
+
+html+=`<button onclick="share('${name}')">WhatsApp</button>`;
+
+clientList.innerHTML=html;
+}
+
+function markPaid(i){
+logs[i].paid=true;
+save();
+}
+
+function share(name){
+let data=logs.filter(l=>l.name==name&&!l.paid);
+let total=data.length*15;
+
+let msg=`Hi ${name}\nPending:\n`;
+
+data.forEach(l=>{
+msg+=l.date+"\n";
+});
+
+msg+=`Total $${total}`;
+
+let encoded=encodeURIComponent(msg);
+
+window.location.href=`whatsapp://send?text=${encoded}`;
+
+setTimeout(()=>{
+window.open(`https://wa.me/?text=${encoded}`);
+},1500);
+}
+
+function showCalendarLogs(){
+let d=calDate.value;
+calLogs.innerHTML="";
+logs.filter(l=>l.date==d)
+.forEach(l=>{
+calLogs.innerHTML+=`<div>${l.name}</div>`;
+});
+}
+
+/* SUMMARY */
+
+let dayChart,weekChart,revenueChart,customerChart;
+
+function renderSummary(){
+
+let selected=monthPicker.value;
+let now=new Date();
+
+let month=selected?new Date(selected).getMonth():now.getMonth();
+let year=selected?new Date(selected).getFullYear():now.getFullYear();
+
+let days=[0,0,0,0,0,0,0];
+let weeks=[0,0,0,0,0];
+let revenue=[0,0,0,0,0];
+let customers={};
+
+logs.forEach(l=>{
+let d=new Date(l.date);
+
+if(d.getMonth()!=month||d.getFullYear()!=year) return;
+
+let day=d.getDay();
+day=(day==0)?6:day-1;
+days[day]++;
+
+let w=Math.ceil(d.getDate()/7);
+weeks[w-1]++;
+
+if(l.paid) revenue[w-1]+=15;
+
+if(!customers[l.name]) customers[l.name]=0;
+customers[l.name]++;
+});
+
+let top=Object.entries(customers).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+if(dayChart) dayChart.destroy();
+if(weekChart) weekChart.destroy();
+if(revenueChart) revenueChart.destroy();
+if(customerChart) customerChart.destroy();
+
+dayChart=new Chart(dayChart=document.getElementById("dayChart"),{
+type:"bar",
+data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+datasets:[{data:days}]}
+});
+
+weekChart=new Chart(document.getElementById("weekChart"),{
+type:"bar",
+data:{labels:["W1","W2","W3","W4","W5"],
+datasets:[{data:weeks}]}
+});
+
+revenueChart=new Chart(document.getElementById("revenueChart"),{
+type:"bar",
+data:{labels:["W1","W2","W3","W4","W5"],
+datasets:[{data:revenue}]}
+});
+
+customerChart=new Chart(document.getElementById("customerChart"),{
+type:"bar",
+data:{labels:top.map(c=>c[0]),
+datasets:[{data:top.map(c=>c[1])}]}
+});
+
+}
+
+function downloadCharts(){
+[dayChart,weekChart,revenueChart,customerChart].forEach((c,i)=>{
+let a=document.createElement("a");
+a.href=c.toBase64Image();
+a.download=`chart${i}.png`;
+a.click();
+});
+}
+
+updateStats();
+renderLogs();
+renderClients();
+
+</script>
+
+</body>
+</html>
